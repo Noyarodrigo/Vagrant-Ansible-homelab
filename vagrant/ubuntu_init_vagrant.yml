@@ -1,0 +1,45 @@
+- name: init configure ubuntu
+  hosts: all
+  gather_facts: true
+  become: true
+  vars_files:
+    - paquetes.yml
+  handlers:
+    - name: restart_sshd
+      service:
+        name: sshd
+        state: restarted
+  tasks:
+    - name: Update apt repo
+      apt: update_cache=yes force_apt_get=yes
+
+    - name: Upgrade all packages on servers
+      apt: upgrade=dist force_apt_get=yes
+
+    #instalar lista de paquetes, modificar en paquetes.yaml  
+    - name: Instalar Lista de paquetes
+      ansible.builtin.package:
+        name: "{{ paquetes }}"
+        state: present
+
+    - name: Create user
+      user:
+        name: "{{ user }}"
+        state: present
+        password: " {{ password }}"
+        update_password: on_create
+        shell: /bin/bash
+
+    - name: Edit SSHD Config
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication '
+        insertafter: '#PasswordAuthentication'
+        line: 'PasswordAuthentication yes'
+      notify: restart_sshd
+
+    - name: Add sudo rights for user
+      copy:
+        dest: /etc/sudoers.d/roi
+        content: "{{ user }} ALL=(root) NOPASSWD: ALL"
+        backup: true
